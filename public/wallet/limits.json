@@ -1,0 +1,7 @@
+{
+  "note": "Set by the human, once. The muse cannot raise these. Amounts are USDG.",
+  "maxPerPayment": 5,
+  "maxPerDay": 20,
+  "onlyProvenWallets": true,
+  "allow": []
+}

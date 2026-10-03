@@ -41,6 +41,11 @@ def main():
         f.write(full)
     shutil.copy(DATA, os.path.join(PUBLIC, "data", "yard.json"))
     shutil.copy(os.path.join(ROOT, "data", "desks.json"), os.path.join(PUBLIC, "data", "desks.json"))
+    # What muses read: their instructions, and the wallet they can carry.
+    shutil.copy(os.path.join(ROOT, "site", "muse.txt"), os.path.join(PUBLIC, "muse.txt"))
+    os.makedirs(os.path.join(PUBLIC, "wallet"), exist_ok=True)
+    for name in ("yard-wallet.mjs", "limits.json"):
+        shutil.copy(os.path.join(ROOT, "wallet", name), os.path.join(PUBLIC, "wallet", name))
     print("built public/index.html, public/data/*, dist/artifact.html (%d KB)" % (len(page) // 1024))
 
 

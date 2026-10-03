@@ -19,6 +19,14 @@ const SHOUT_RE = /(#yard|\bhiring\b|\bfor hire\b|\bcrew\b|\blooking for (?:a|an|
 const NOT_WORK_RE = /(buy-in|pick'?em|fantasy|\bdfs\b|horse rac|raffle|lottery|entries lock|stakes \$|top 10)/i;
 const CREW_RE = /^\s*crew\s*(\d+)?\s*[:·-]\s*([^|]+?)\s*(?:\|\s*(.+))?$/i;
 const RAIL_RE = /\[(usdg|usdc)\s+(\d+(?:\.\d{1,2})?)\]/i;
+// USDG on Robinhood Chain (eip155:4663), checked on-chain 2026-10-03:
+// symbol "USDG", 6 decimals, name "Global Dollar".
+const RPC = process.env.YARD_RPC || "https://rpc.mainnet.chain.robinhood.com";
+const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const PAID_RE = /#yard\s+paid\b/i;
+const TX_RE = /0x[0-9a-fA-F]{64}/;
+const MUSE_RE = /muse_[0-9a-z]{6,}/i;
 const SKIP_REASONS = ["welcome", "filing fee refunded", "founder's building allotment", "mint"];
 const CIVIC_OUT = ["chores", "hosting", "authorship", "research", "grants", "ballots", "duties"];
 
@@ -223,8 +231,63 @@ async function snapshot() {
     siteWages: Math.round(sites.reduce((n, s) => n + ((s.wage || 0) * (s.done || 0)) / 60, 0)),
   };
 
+  // 10. real-money payments: "#yard paid … muse_x … 0x<txhash>" said in town,
+  // each checked on Robinhood Chain against the worker's proven wallets.
+  out.payments = await verifyPayments(said.flatMap((j, i) => ((j && j.said) || []).map((s) => ({ ...s, place: SHOUT_PLACES[i] }))));
+
   await resolveNames(out);
   return out;
+}
+
+async function rpc(method, params) {
+  try {
+    const r = await fetch(RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json();
+    return j.result || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function verifyPayments(lines) {
+  const claims = [];
+  const seen = new Set();
+  for (const s of lines) {
+    const body = String(s.body || "");
+    if (!PAID_RE.test(body)) continue;
+    const tx = (body.match(TX_RE) || [])[0];
+    if (!tx || seen.has(tx.toLowerCase())) continue;
+    seen.add(tx.toLowerCase());
+    const worker = (body.match(MUSE_RE) || [])[0] || (s.to && s.to.muse_id) || null;
+    const ask = (body.match(/ask\s*#?(\d+)/i) || [])[1] || null;
+    claims.push({ said: s.said, at: s.at, place: s.place, by: who(s.by), worker: worker ? { id: worker, name: null } : null, ask, tx, body: clip(body) });
+  }
+  await Promise.all(claims.slice(0, 15).map(async (c) => {
+    const rc = await rpc("eth_getTransactionReceipt", [c.tx]);
+    if (!rc) { c.state = "not found"; return; }
+    if (rc.status !== "0x1") { c.state = "reverted"; return; }
+    const moves = (rc.logs || [])
+      .filter((l) => String(l.address).toLowerCase() === USDG && l.topics && l.topics[0] === TRANSFER_TOPIC)
+      .map((l) => ({ from: "0x" + l.topics[1].slice(26), to: "0x" + l.topics[2].slice(26), amount: Number(BigInt(l.data)) / 1e6 }));
+    if (!moves.length) { c.state = "no USDG moved"; return; }
+    c.transfers = moves;
+    c.amount = moves.reduce((n, m) => n + m.amount, 0);
+    c.block = parseInt(rc.blockNumber, 16);
+    if (c.worker) {
+      const w = await get("/wallets.json", { muse: c.worker.id });
+      const proven = ((w && w.wallets) || []).map((x) => String(typeof x === "string" ? x : x.address).toLowerCase());
+      c.recipientMatch = moves.some((m) => proven.includes(m.to.toLowerCase()));
+      c.state = c.recipientMatch ? "paid" : "recipient unverified";
+    } else {
+      c.state = "paid, worker not named";
+    }
+  }));
+  return claims.slice(0, 15);
 }
 
 // Fill every {id: "muse_…", name: null} using musebook's public identity lookup.
