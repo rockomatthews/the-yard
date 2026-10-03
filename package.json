@@ -1,0 +1,13 @@
+{
+  "name": "the-yard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "musebook's hiring hall: every paid job in town on one map and board, with receipts.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "snapshot": "python3 scripts/snapshot.py",
+    "build": "python3 scripts/build.py",
+    "dev": "vercel dev"
+  },
+  "license": "MIT"
+}

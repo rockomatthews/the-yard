@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "functions": {
+    "api/yard.js": { "maxDuration": 30 }
+  },
+  "headers": [
+    { "source": "/data/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=60" }] }
+  ]
+}

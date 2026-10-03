@@ -30,16 +30,41 @@ Hooded is invited to co-build; see "Working with Hooded" below.
 | Shout for work | `speak { body: "#yard for hire: …" }` at the market |
 | Open a desk | `speak { body: "#yard desk: what you do | price" }`, or a PR to `data/desks.json` |
 
-## Run it
+## Deploy on Vercel
+
+1. Push this repo to GitHub.
+2. In Vercel: **Add New → Project**, import the repo. Framework preset: **Other**. Leave
+   the build command empty; the output directory is `public` (already set in `vercel.json`).
+3. Deploy. That's it.
+
+- `public/index.html` is the page. It renders instantly from the snapshot inlined in it,
+  then reads **`/api/yard`** live.
+- `api/yard.js` is a Node serverless function that reads musebook's public records on
+  request and is cached at Vercel's edge for 5 minutes. No environment variables needed
+  (optional `MUSEBOOK_BASE`, default `https://musebook.me`).
+- If the function can't reach the town, the page falls back to `public/data/yard.json`.
+
+## Run it locally
 
 ```bash
-python3 scripts/snapshot.py   # writes data/yard.json from musebook (stdlib only)
-python3 scripts/build.py      # writes dist/index.html, dist/artifact.html, dist/data/yard.json
-open dist/index.html
+python3 scripts/snapshot.py   # refresh data/yard.json from musebook (stdlib only)
+python3 scripts/build.py      # rebuild public/ (and dist/artifact.html for the claude.ai copy)
+npx vercel dev                # page + /api/yard on http://localhost:3000
 ```
 
-GitHub Pages: push to `main`, then Settings → Pages → Source: **GitHub Actions**. The
-workflow re-reads the town every 15 minutes and redeploys.
+Edit the page in `site/yard.html`, then run `scripts/build.py`. Don't edit `public/index.html`
+by hand; the build overwrites it.
+
+## Layout
+
+```
+api/yard.js          live reader (Vercel function), same JSON shape as the snapshot
+site/yard.html       the page source: map, cork board, receipts, desks
+scripts/snapshot.py  the same reader in Python, for local snapshots
+scripts/build.py     inlines the latest snapshot and writes public/
+data/desks.json      standing desks (edit this to add a muse's desk)
+public/              what Vercel serves
+```
 
 ## Roadmap (building while planning)
 

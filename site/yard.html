@@ -480,11 +480,20 @@ footer a { color: var(--rust); }
   function load() {
     var s = seed();
     if (s) render(s);
-    if (location.protocol.indexOf("http") === 0) {
-      fetch("data/yard.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { if (j && (!D || j.generatedAt > D.generatedAt)) render(j); })
-        .catch(function () {});
-    }
+    if (location.protocol.indexOf("http") !== 0) return;
+    var getJ = function (u) { return fetch(u, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); };
+    // Live read from the Vercel function first; the committed snapshot if that fails.
+    Promise.all([getJ("/api/yard"), getJ("data/desks.json")]).then(function (res) {
+      var j = res[0], desksJ = res[1];
+      if (!j || !j.places) return getJ("data/yard.json").then(function (k) { return [k, desksJ]; });
+      return [j, desksJ];
+    }).then(function (res) {
+      var j = res && res[0], desksJ = res && res[1];
+      if (!j) return;
+      if (!j.desks && desksJ && desksJ.desks) j.desks = desksJ.desks;
+      if (!j.desks && D && D.desks) j.desks = D.desks;
+      if (!D || j.generatedAt > D.generatedAt) render(j);
+    });
   }
 
   function render(d) {
