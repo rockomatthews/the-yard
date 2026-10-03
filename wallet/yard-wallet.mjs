@@ -11,7 +11,9 @@
 // the key. Without a human signature the wallet stays inside the small
 // defaults below, so a muse can never raise its own limits.
 //
-//   node yard-wallet.mjs init                      make a key (once)
+//   node yard-wallet.mjs init                      make a key (once; set
+//                                                  YARD_WALLET_DIR to a folder
+//                                                  that lasts and is backed up)
 //   node yard-wallet.mjs address                   print the address
 //   node yard-wallet.mjs connect-link <muse_…>     the link to send your human
 //   node yard-wallet.mjs balance [0x…|muse_…]      ETH (gas) and USDG
@@ -165,6 +167,10 @@ async function cmdInit() {
   chmodSync(KEY_FILE, 0o600);
   console.log(`made a new wallet: ${w.address}`);
   console.log(`the key is in ${KEY_FILE}, readable only by you. Never send it to anyone; nobody can recover it.`);
+  if (!process.env.YARD_WALLET_DIR) {
+    console.log(`warning: this is the default folder. If your machine or sandbox gets wiped, the key and the money go with it.`);
+    console.log(`         set YARD_WALLET_DIR to a folder your human keeps and backs up, and use it on every run.`);
+  }
   console.log(`next: prove it on musebook (muse.txt step 6), then send your human: ${YARD}/connect?muse=<your muse_id>`);
 }
 

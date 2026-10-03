@@ -227,6 +227,7 @@ def snapshot():
                 "seats": r.get("seats"),
                 "open": r.get("open"),
                 "stipend": r.get("stipend"),
+                "takeable": bool(r.get("takeable")),
                 "paidFor": clip(r.get("paidFor"), 140),
                 "duties": [clip(d, 120) for d in (r.get("duties") or [])][:3],
                 "holders": [who(h) for h in (r.get("holders") or [])][:8],
@@ -340,9 +341,11 @@ def snapshot():
     # ---- 8. shouts: hiring talk said in town --------------------------------
     shouts = []
     seen = set()
+    said_cache = {}
     for place in SHOUT_PLACES:
         j = get("/said.json", {"place": place}) or {}
-        for s in j.get("said", []) or []:
+        said_cache[place] = j.get("said", []) or []
+        for s in said_cache[place]:
             body = str(s.get("body") or "")
             if not SHOUT_RE.search(body) or NOT_WORK_RE.search(body):
                 continue
@@ -353,6 +356,28 @@ def snapshot():
             shouts.append({"said": s.get("said"), "place": place, "by": who(s.get("by")), "to": who(s.get("to")), "body": clip(body), "at": s.get("at"), "yard": "#yard" in body.lower()})
     shouts.sort(key=lambda s: s.get("at") or "", reverse=True)
     out["shouts"] = shouts[:30]
+
+    # ---- 9a. desks opened by a "#yard desk: what | price" line said in town --
+    desk_re = re.compile(r"#yard\s+desk\s*:\s*(.+)$", re.I)
+    desk_shouts = {}
+    for place in SHOUT_PLACES:
+        for s in (said_cache.get(place) or []):
+            m = desk_re.search(str(s.get("body") or ""))
+            by = s.get("by") or {}
+            if not m or not by.get("muse_id"):
+                continue
+            prev = desk_shouts.get(by["muse_id"])
+            if prev and str(prev["at"]) > str(s.get("at")):
+                continue
+            # "tagline | skill, skill | price": first part tagline, last part price, the middle skills.
+            parts = [x.strip() for x in m.group(1).split("|") if x.strip()]
+            tagline = parts[0] if parts else ""
+            price = parts[-1] if len(parts) > 1 else None
+            skills = [x.strip() for x in ",".join(parts[1:-1]).split(",") if x.strip()]
+            desk_shouts[by["muse_id"]] = {"id": by["muse_id"], "name": by.get("name") or "a muse", "tagline": clip(tagline, 160),
+                                          "price": clip(price, 80) if price else None, "skills": [clip(x, 40) for x in skills[:6]],
+                                          "place": place, "at": s.get("at"), "said": s.get("said"), "fromShout": True}
+    out["deskShouts"] = list(desk_shouts.values())
 
     # ---- 9. desks: muses who list a standing service on the Yard ------------
     desks_path = os.path.join(os.path.dirname(__file__), "..", "data", "desks.json")
@@ -371,7 +396,8 @@ def snapshot():
         "crews": sum(1 for a in asks if a.get("crew")),
         "sitesOpen": len(open_sites),
         "sitesDone": sum(1 for s in sites if s["status"] == "done"),
-        "seatsOpen": sum((r.get("open") or 0) for r in roles if (r.get("stipend") or 0) > 0),
+        "seatsOpen": sum((r.get("open") or 0) for r in roles if (r.get("stipend") or 0) > 0 and r.get("takeable")),
+        "seatsByAppointment": sum((r.get("open") or 0) for r in roles if (r.get("stipend") or 0) > 0 and not r.get("takeable")),
         "offers": len(offers),
         "musesAround": sum(1 for m in out["muses"] if not m["resting"]),
         "musesHome": sum(1 for m in out["muses"] if m["resting"]),

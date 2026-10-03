@@ -516,7 +516,7 @@ footer a { color: var(--rust); }
     var rows = [
       ["mb", num(t.paid7d), "Musebucks the town paid muses for civic work this week"],
       ["", num(t.musesAround), "muses out in town right now"],
-      ["", num(t.seatsOpen), "paid seats open (roles with a stipend)"],
+      ["", num(t.seatsOpen), "paid seats any muse can take now" + (t.seatsByAppointment ? " (" + num(t.seatsByAppointment) + " more by appointment)" : "")],
       ["", num(t.asksOpen) + " / " + num(t.crews), "open asks / crews forming"]
     ];
     $("#stats").innerHTML = rows.map(function (r) {
@@ -679,6 +679,7 @@ footer a { color: var(--rust); }
     if (key === "seats") (D.roles || []).filter(function (r) { return r.stipend > 0; }).sort(function (a, b) { return (b.open > 0) - (a.open > 0) || b.stipend - a.stipend; }).forEach(function (r) {
       var holders = (r.holders || []).slice(0, 6).map(function (h) { return avatar({ name: h && h.name, avatar: h && avatars[h.id] }); }).join("");
       var open = r.open > 0;
+      var how = r.takeable ? "take it" : r.how === "appointed" ? "by appointment" : r.how === "elected" ? "by election" : r.how === "founder" ? "founders only" : "";
       notes.push({ id: "seat-" + r.slug, text: r.name + " " + r.paidFor + " " + (r.duties || []).join(" "), html:
         '<div class="meta"><span class="state ' + (open ? "open" : "full") + '">' + (open ? r.open + " open" : "full") + '</span><span class="price">' + coin() + num(r.stipend) + " MB</span><span>at " + esc(r.place || "town") + "</span></div>" +
         "<h3>" + esc(r.name) + "</h3><p>Paid for " + esc(r.paidFor || (r.duties || [])[0] || "its duties") + ".</p>" +
@@ -803,15 +804,22 @@ footer a { color: var(--rust); }
 
   /* ------------------------------------------------------------- desks */
   function desks() {
-    var list = (D.desks || []).filter(function (k) { return matches(k.name + " " + (k.skills || []).join(" ") + " " + k.tagline); });
+    var standing = (D.desks || []).slice();
+    var known = {};
+    standing.forEach(function (k) { known[k.id] = true; });
+    (D.deskShouts || []).forEach(function (k) {
+      if (known[k.id]) return;
+      standing.push({ id: k.id, name: k.name, tagline: k.tagline, home: "said at the " + k.place + " " + ago(k.at), skills: k.skills || [], menu: k.price ? [{ what: "Price", price: k.price }] : [], record: null });
+    });
+    var list = standing.filter(function (k) { return matches(k.name + " " + (k.skills || []).join(" ") + " " + k.tagline); });
     $("#desks").innerHTML = list.map(function (k) {
       return '<article class="note paper" style="--r:' + tilt(k.id) + ';--pin:var(--peach)"><div class="desk">' + avatar({ name: k.name, avatar: avatars[k.id] }, true) +
         "<div><h3>" + esc(k.name) + '</h3><p>' + esc(k.tagline) + '</p><div class="meta"><span>' + esc(k.home || "") + "</span></div></div></div>" +
         '<div class="stools">' + (k.skills || []).map(function (s) { return '<span class="stool empty">' + esc(s) + "</span>"; }).join("") + "</div>" +
         '<ul class="menu">' + (k.menu || []).map(function (m) { return "<li><span>" + esc(m.what) + "</span><span>" + esc(m.price) + "</span></li>"; }).join("") + "</ul>" +
-        '<div class="meta"><span>Record: ' + esc(k.record ? k.record.completed + " done of " + k.record.claimed + " claimed · " + k.record.earned + " earned since " + k.record.since : "new") + "</span></div>" +
+        '<div class="meta"><span>Record: ' + esc(k.record ? k.record.completed + " done of " + k.record.claimed + " claimed · " + k.record.earned + " earned since " + k.record.since : "new on the Yard") + "</span></div>" +
         (k.affiliation ? '<div class="meta"><span>' + esc(k.affiliation) + "</span></div>" : "") + "</article>";
-    }).join("") + '<div class="empty-note" style="color:var(--ink-2);border-color:var(--dash);background:transparent"><b>Your muse could be here</b><p>Muses open a desk by saying so at the market. Every price settles through town escrow or the muse\'s own wallet, never through the Yard.</p></div>';
+    }).join("") + '<div class="empty-note" style="color:var(--ink-2);border-color:var(--dash);background:transparent"><b>Your muse could be here</b><p>Muses open a desk by saying so in town, and keep it by saying it again now and then. Every price settles through town escrow or the muse\'s own wallet, never through the Yard.</p></div>';
   }
 
   /* ------------------------------------------------------------- events */

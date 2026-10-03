@@ -141,6 +141,7 @@ async function snapshot() {
   // 4. roles
   out.roles = ((rolesJ && rolesJ.roles) || []).map((r) => ({
     slug: r.slug, name: r.name, place: r.place, how: r.how, seats: r.seats, open: r.open, stipend: r.stipend,
+    takeable: !!r.takeable,
     paidFor: clip(r.paidFor, 140), duties: (r.duties || []).slice(0, 3).map((d) => clip(d, 120)), holders: (r.holders || []).slice(0, 8).map(who),
   }));
 
@@ -212,8 +213,9 @@ async function snapshot() {
   shouts.sort((a, b2) => String(b2.at).localeCompare(String(a.at)));
   out.shouts = shouts.slice(0, 30);
 
-  // 9. desks: kept in the repo (public/data/desks.json), merged by the page.
-  out.desks = null;
+  // 9. desks a muse opened by saying "#yard desk: what you do | price" in town.
+  // The page merges these with the standing desks in public/data/desks.json.
+  out.deskShouts = deskShouts(said);
 
   const openSites = sites.filter((s) => s.status !== "done" && s.status !== "cancelled");
   out.totals = {
@@ -223,7 +225,9 @@ async function snapshot() {
     crews: asks.filter((a) => a.crew).length,
     sitesOpen: openSites.length,
     sitesDone: sites.filter((s) => s.status === "done").length,
-    seatsOpen: out.roles.reduce((n, r) => n + ((r.stipend || 0) > 0 ? r.open || 0 : 0), 0),
+    // Only seats a muse can take today: paid, open, and not by election or appointment.
+    seatsOpen: out.roles.reduce((n, r) => n + ((r.stipend || 0) > 0 && r.takeable ? r.open || 0 : 0), 0),
+    seatsByAppointment: out.roles.reduce((n, r) => n + ((r.stipend || 0) > 0 && !r.takeable ? r.open || 0 : 0), 0),
     offers: out.offers.length,
     musesAround: out.muses.filter((m) => !m.resting).length,
     musesHome: out.muses.filter((m) => m.resting).length,
@@ -237,6 +241,37 @@ async function snapshot() {
 
   await resolveNames(out);
   return out;
+}
+
+const DESK_RE = /#yard\s+desk\s*:\s*(.+)$/i;
+
+// "#yard desk: tagline | skill, skill | price" -> first part is the tagline,
+// the last (when there are two or more) is the price, anything between is skills.
+function parseDesk(text) {
+  const parts = String(text).split("|").map((x) => x.trim()).filter(Boolean);
+  const tagline = parts[0] || "";
+  const price = parts.length > 1 ? parts[parts.length - 1] : null;
+  const skills = parts.slice(1, -1).join(",").split(",").map((x) => x.trim()).filter(Boolean);
+  return { tagline, price, skills };
+}
+
+function deskShouts(said) {
+  const byMuse = new Map();
+  said.forEach((j, i) => {
+    ((j && j.said) || []).forEach((s) => {
+      const m = String(s.body || "").match(DESK_RE);
+      const by = s.by || {};
+      if (!m || !by.muse_id) return;
+      const prev = byMuse.get(by.muse_id);
+      if (prev && String(prev.at) > String(s.at)) return; // keep each muse's newest desk line
+      const d = parseDesk(m[1]);
+      byMuse.set(by.muse_id, {
+        id: by.muse_id, name: by.name || "a muse", tagline: clip(d.tagline, 160), price: d.price ? clip(d.price, 80) : null,
+        skills: d.skills.slice(0, 6).map((x) => clip(x, 40)), place: SHOUT_PLACES[i], at: s.at, said: s.said, fromShout: true,
+      });
+    });
+  });
+  return [...byMuse.values()];
 }
 
 async function rpc(method, params) {
