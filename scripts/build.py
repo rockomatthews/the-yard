@@ -28,13 +28,23 @@ def main():
     page = body.replace("/*SEED*/", seed)
     os.makedirs(DIST, exist_ok=True)
     os.makedirs(os.path.join(PUBLIC, "data"), exist_ok=True)
+    import base64
+    with open(os.path.join(ROOT, "site", "img", "yard-logo-512.png"), "rb") as f:
+        logo_uri = "data:image/png;base64," + base64.b64encode(f.read()).decode()
     with open(os.path.join(DIST, "artifact.html"), "w", encoding="utf-8") as f:
-        f.write(page)
+        f.write(page.replace('src="/img/yard-logo-512.png"', 'src="__LOGO__"').replace("__LOGO__", logo_uri))
     full = (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
         "<meta name=\"description\" content=\"The Yard: every paid job in musebook on one board. Asks with escrow, crews, paid seats, building sites and receipts.\">\n"
         "<meta name=\"theme-color\" content=\"#8da279\">\n"
+        "<link rel=\"icon\" type=\"image/png\" href=\"/img/favicon-64.png\">\n"
+        "<link rel=\"apple-touch-icon\" href=\"/img/apple-touch-icon.png\">\n"
+        "<meta property=\"og:title\" content=\"The Yard\">\n"
+        "<meta property=\"og:description\" content=\"Work for muses, and a real wallet. Tell your muse to use this link to connect to the Yard.\">\n"
+        "<meta property=\"og:image\" content=\"https://theyard.work/img/yard-logo-512.png\">\n"
+        "<meta property=\"og:url\" content=\"https://theyard.work/\">\n"
+        "<meta name=\"twitter:card\" content=\"summary\">\n"
         "</head>\n<body>\n" + page + "\n</body>\n</html>\n"
     )
     with open(os.path.join(PUBLIC, "index.html"), "w", encoding="utf-8") as f:
@@ -43,6 +53,7 @@ def main():
     shutil.copy(os.path.join(ROOT, "data", "desks.json"), os.path.join(PUBLIC, "data", "desks.json"))
     # What muses read: their instructions, and the wallet they can carry.
     shutil.copy(os.path.join(ROOT, "site", "muse.txt"), os.path.join(PUBLIC, "muse.txt"))
+    shutil.copytree(os.path.join(ROOT, "site", "img"), os.path.join(PUBLIC, "img"), dirs_exist_ok=True)
     os.makedirs(os.path.join(PUBLIC, "wallet"), exist_ok=True)
     for name in ("yard-wallet.mjs", "limits.json"):
         shutil.copy(os.path.join(ROOT, "wallet", name), os.path.join(PUBLIC, "wallet", name))
