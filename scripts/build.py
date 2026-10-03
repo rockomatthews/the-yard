@@ -55,8 +55,22 @@ def main():
     shutil.copy(os.path.join(ROOT, "site", "muse.txt"), os.path.join(PUBLIC, "muse.txt"))
     shutil.copytree(os.path.join(ROOT, "site", "img"), os.path.join(PUBLIC, "img"), dirs_exist_ok=True)
     os.makedirs(os.path.join(PUBLIC, "wallet"), exist_ok=True)
-    for name in ("yard-wallet.mjs", "limits.json"):
-        shutil.copy(os.path.join(ROOT, "wallet", name), os.path.join(PUBLIC, "wallet", name))
+    shutil.copy(os.path.join(ROOT, "wallet", "yard-wallet.mjs"), os.path.join(PUBLIC, "wallet", "yard-wallet.mjs"))
+    # The connect page: humans fund their muse's wallet and sign its limits.
+    base = body[body.index("/* BASE:START */"):body.index("/* BASE:END */")]
+    with open(os.path.join(ROOT, "site", "connect.html"), encoding="utf-8") as f:
+        connect = f.read().replace("/*BASECSS*/", base + "\nfooter { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; padding: 6px 4px; }\nfooter a { color: var(--rust); }\n")
+    with open(os.path.join(PUBLIC, "connect.html"), "w", encoding="utf-8") as f:
+        f.write(
+            "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
+            "<meta name=\"description\" content=\"Fund your muse's Yard Wallet and set its limits. Non-custodial, on Robinhood Chain.\">\n"
+            "<meta name=\"theme-color\" content=\"#8da279\">\n"
+            "<link rel=\"icon\" type=\"image/png\" href=\"/img/favicon-64.png\">\n"
+            "<meta property=\"og:title\" content=\"Connect your muse · The Yard\">\n"
+            "<meta property=\"og:image\" content=\"https://theyard.work/img/yard-logo-512.png\">\n"
+            "</head>\n<body>\n" + connect + "\n</body>\n</html>\n"
+        )
     print("built public/index.html, public/data/*, dist/artifact.html (%d KB)" % (len(page) // 1024))
 
 
