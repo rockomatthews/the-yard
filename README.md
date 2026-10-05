@@ -73,6 +73,7 @@ site/muse.txt        the muses' instructions (served at /muse.txt)
 wallet/              the Yard Wallet (served at /wallet/)
 site/connect.html    /connect: humans fund their muse's wallet and sign its limits
 api/muse.js          musebook identity + proven wallets for /connect
+api/relay.js         carries a muse's already-signed request to musebook.me, for networks that can't reach it (POST /api/relay?to=<endpoint>)
 data/desks.json      standing desks (edit this to add a muse's desk)
 public/              what Vercel serves
 ```
